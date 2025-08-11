@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake</title>
+    <style>
+        :root {
+            --bg-dark: #0D1117;
+            --bg-light: #161B22;
+            --text-primary: #E6EDF3;
+            --text-secondary: #7D8590;
+            --accent-primary: #58A6FF;
+            --accent-secondary: #8BCEFF;
+            --food-color: #F778BA;
+            --danger-red: #F43F5E;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+            to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes animated-glow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        body {
+            background-color: #000;
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        #page-background-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+        }
+
+        #game-container {
+            text-align: center;
+            background-color: var(--bg-light);
+            border-radius: 24px;
+            padding: 3px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            width: calc(100% - 2rem);
+            max-width: 500px;
+            transition: background-color 0.5s ease;
+            position: relative;
+            z-index: 10;
+            overflow: hidden;
+        }
+        
+        #game-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 0;
+            background: linear-gradient(90deg, #00ff87, #60efff, #ff66ff, #ffc466, #00ff87);
+            background-size: 400%;
+            animation: animated-glow 6s linear infinite;
+        }
+        
+        #inner-container {
+            background-color: var(--bg-light);
+            border-radius: 22px;
+            padding: clamp(1rem, 5vw, 2rem);
+            position: relative;
+            z-index: 1;
+        }
+
+
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            margin: 0;
+            transition: color 0.5s ease;
+        }
+
+        #score-display {
+            font-size: 1.5rem;
+            font-weight: 500;
+            background-color: var(--bg-dark);
+            padding: 0.5rem 1rem;
+            border-radius: 12px;
+            min-width: 100px;
+            text-align: center;
+            transition: background-color 0.5s ease, color 0.5s ease;
+        }
+        
+        #game-canvas {
+            background-color: #000000; 
+            border-radius: 16px;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+        }
+        
+        #controls {
+            margin-top: 2rem;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 12px;
+            max-width: 240px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .control-btn {
+            /* [CHANGED] New glossy greyish-white background */
+            background: linear-gradient(180deg, #F0F3F6 0%, #DDE2E7 100%);
+            border: 1px solid #C0C5CC;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);
+            color: #161B22;
+            cursor: pointer;
+            border-radius: 16px;
+            padding: 1rem;
+            user-select: none;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .control-btn::before, #restart-btn::before, #theme-btn::before {
+            content: '';
+            position: absolute;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
+            z-index: -1;
+            background: linear-gradient(90deg, #58A6FF, #A371F7, #F778BA, #58A6FF);
+            background-size: 400%;
+            border-radius: inherit;
+            animation: animated-glow 8s linear infinite;
+            filter: blur(6px);
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .control-btn:hover::before, #restart-btn:hover::before, #theme-btn:hover::before {
+            opacity: 0.8;
+        }
+        
+        .control-btn:hover {
+            background: linear-gradient(180deg, #FFFFFF 0%, #E8EDF2 100%);
+            border-color: #8B949E;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+            background: #CDD5DF;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        #up-btn { grid-column: 2 / 3; }
+        #left-btn { grid-column: 1 / 2; grid-row: 2 / 3; }
+        #down-btn { grid-column: 2 / 3; grid-row: 2 / 3; }
+        #right-btn { grid-column: 3 / 4; grid-row: 2 / 3; }
+
+        #game-over-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(22, 27, 34, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 2.5rem;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: none;
+            z-index: 100;
+            width: calc(100% - 4rem);
+            max-width: 400px;
+        }
+        
+        #game-over-box.active {
+            display: block;
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        #game-over-box h2 {
+            margin: 0 0 1rem 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        #final-score {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        #restart-btn {
+            background-color: var(--accent-primary);
+            color: #fff;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.125rem;
+            font-weight: 500;
+            font-family: inherit;
+            border-radius: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 1.5rem;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            position: relative;
+            z-index: 1;
+        }
+
+        #restart-btn:hover {
+            filter: brightness(1.1);
+        }
+        #restart-btn:active {
+            transform: scale(0.98);
+        }
+
+        #theme-generator {
+            margin-top: 1.5rem;
+            width: 100%;
+        }
+
+        #theme-prompt {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 12px;
+            border: 1px solid #30363D;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        #theme-btn {
+            background: linear-gradient(45deg, #A371F7, #F778BA);
+            color: var(--text-primary);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 0.75rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        #theme-btn:hover {
+            filter: brightness(1.1);
+            box-shadow: 0 0 15px rgba(163, 113, 247, 0.5);
+        }
+        #theme-btn.loading .text {
+            display: none;
+        }
+        #theme-btn .loader {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        #theme-btn.loading .loader {
+            display: block;
+        }
+        #api-error {
+            color: var(--danger-red);
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+    <canvas id="page-background-canvas"></canvas>
+
+    <div id="game-container">
+        <div id="inner-container">
+            <div id="header">
+                <h1>SnakeGame</h1>
+                <div id="score-display">0</div>
+            </div>
+            <canvas id="game-canvas"></canvas>
+            <div id="controls">
+                <button id="up-btn" class="control-btn"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></button>
+                <button id="left-btn" class="control-btn"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg></button>
+                <button id="down-btn" class="control-btn"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg></button>
+                <button id="right-btn" class="control-btn"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-over-box">
+        <h2>Game Over</h2>
+        <div id="final-score"></div>
+        <div id="theme-generator">
+            <input type="text" id="theme-prompt" placeholder="e.g., vaporwave sunset">
+            <button id="theme-btn">
+                <span class="text">✨ Generate Theme</span>
+                <div class="loader"></div>
+            </button>
+            <p id="api-error"></p>
+        </div>
+        <button id="restart-btn">Play Again</button>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+
+            // --- DOM Elements ---
+            const canvas = document.getElementById('game-canvas');
+            const ctx = canvas.getContext('2d');
+            const pageBgCanvas = document.getElementById('page-background-canvas');
+            const pageBgCtx = pageBgCanvas.getContext('2d');
+
+            const scoreDisplay = document.getElementById('score-display');
+            const gameOverBox = document.getElementById('game-over-box');
+            const finalScoreDisplay = document.getElementById('final-score');
+            const restartBtn = document.getElementById('restart-btn');
+            const themePromptInput = document.getElementById('theme-prompt');
+            const themeBtn = document.getElementById('theme-btn');
+            const apiError = document.getElementById('api-error');
+
+            // --- Game Settings ---
+            let gridSize = 20;
+            const fruitEmojis = ['🍎', '🍊', '🍓', '🍇', '🍉', '🍌', '�', '🥭', '🍒', '🍑'];
+            
+            // --- Game State ---
+            let snake, food, score, direction, changingDirection, gameLoopTimeout;
+            let gameActive = true;
+            let currentSpeed = 120;
+            let particles = [];
+            let backgroundAnimationId;
+
+            // --- Canvas & Drawing ---
+            function setupCanvas() {
+                let canvasSize = canvas.getBoundingClientRect().width;
+                if (canvasSize === 0) {
+                    canvasSize = 400; 
+                }
+                canvas.width = canvasSize;
+                canvas.height = canvasSize;
+                gridSize = canvas.width / 20;
+
+                pageBgCanvas.width = window.innerWidth;
+                pageBgCanvas.height = window.innerHeight;
+            }
+
+            function initializeGame() {
+                gameActive = true;
+                gameOverBox.classList.remove('active');
+                
+                const center = Math.floor(20 / 2) * gridSize;
+                snake = [
+                    { x: center, y: center },
+                    { x: center - gridSize, y: center },
+                    { x: center - (gridSize * 2), y: center }
+                ];
+                
+                score = 0;
+                scoreDisplay.textContent = score;
+                currentSpeed = 120;
+                
+                direction = { x: gridSize, y: 0 };
+                changingDirection = false;
+                
+                createFood();
+                
+                if (gameLoopTimeout) clearTimeout(gameLoopTimeout);
+                gameLoop();
+            }
+            
+            function gameLoop() {
+                if (!gameActive) return;
+                gameLoopTimeout = setTimeout(() => {
+                    changingDirection = false;
+                    clearCanvas();
+                    drawFood();
+                    moveSnake();
+                    drawSnake();
+                    gameLoop();
+                }, currentSpeed);
+            }
+
+            function clearCanvas() {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            function drawSnake() {
+                const headColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-secondary').trim() || '#60A5FA';
+                const bodyColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim() || '#3B82F6';
+                snake.forEach((part, index) => {
+                    ctx.fillStyle = index === 0 ? headColor : bodyColor;
+                    ctx.fillRect(part.x + 1, part.y + 1, gridSize - 2, gridSize - 2);
+                });
+            }
+
+            function drawFood() {
+                if (!food) return;
+                ctx.font = `${gridSize * 0.8}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(food.emoji, food.x + gridSize / 2, food.y + gridSize / 2);
+            }
+
+            // --- Background Animation Logic ---
+            function initializeBackground() {
+                particles = [];
+                const particleCount = Math.floor((window.innerWidth * window.innerHeight) / 20000);
+                for (let i = 0; i < particleCount; i++) {
+                    particles.push({
+                        x: Math.random() * pageBgCanvas.width,
+                        y: Math.random() * pageBgCanvas.height,
+                        radius: Math.random() * 2 + 1,
+                        vx: (Math.random() - 0.5) * 0.5,
+                        vy: (Math.random() - 0.5) * 0.5
+                    });
+                }
+            }
+            
+            function animateBackground() {
+                pageBgCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                pageBgCtx.fillRect(0, 0, pageBgCanvas.width, pageBgCanvas.height);
+
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    if (p.x < 0 || p.x > pageBgCanvas.width) p.vx *= -1;
+                    if (p.y < 0 || p.y > pageBgCanvas.height) p.vy *= -1;
+
+                    pageBgCtx.beginPath();
+                    pageBgCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    pageBgCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    pageBgCtx.fill();
+                });
+                
+                pageBgCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                pageBgCtx.lineWidth = 1;
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < 150) {
+                            pageBgCtx.beginPath();
+                            pageBgCtx.moveTo(particles[i].x, particles[i].y);
+                            pageBgCtx.lineTo(particles[j].x, particles[j].y);
+                            pageBgCtx.stroke();
+                        }
+                    }
+                }
+
+
+                backgroundAnimationId = requestAnimationFrame(animateBackground);
+            }
+
+
+            // --- Game Logic ---
+            function moveSnake() {
+                if (!snake || snake.length === 0) return;
+                const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+                if (head.x < 0) head.x = canvas.width - gridSize;
+                else if (head.x >= canvas.width) head.x = 0;
+                if (head.y < 0) head.y = canvas.height - gridSize;
+                else if (head.y >= canvas.height) head.y = 0;
+
+                snake.unshift(head);
+                
+                if (food && Math.abs(head.x - food.x) < 1 && Math.abs(head.y - food.y) < 1) {
+                    score++;
+                    scoreDisplay.textContent = score;
+                    if (score % 5 === 0 && currentSpeed > 50) currentSpeed -= 10;
+                    createFood();
+                } else {
+                    snake.pop();
+                }
+                checkCollision();
+            }
+
+            function createFood() {
+                let foodPosition;
+                do {
+                    foodPosition = {
+                        x: Math.floor(Math.random() * 20) * gridSize,
+                        y: Math.floor(Math.random() * 20) * gridSize,
+                        emoji: fruitEmojis[Math.floor(Math.random() * fruitEmojis.length)]
+                    };
+                } while (snake && snake.some(part => part.x === foodPosition.x && part.y === foodPosition.y));
+                food = foodPosition;
+            }
+
+            function checkCollision() {
+                if (!snake || snake.length < 2) return;
+                const head = snake[0];
+                for (let i = 1; i < snake.length; i++) {
+                    if (head.x === snake[i].x && head.y === snake[i].y) {
+                        endGame();
+                    }
+                }
+            }
+            
+            function endGame() {
+                gameActive = false;
+                clearTimeout(gameLoopTimeout);
+                finalScoreDisplay.textContent = `Your final score is ${score}`;
+                gameOverBox.classList.add('active');
+            }
+
+            // --- Gemini API Integration ---
+            async function generateTheme() {
+                const userPrompt = themePromptInput.value;
+                if (!userPrompt) {
+                    apiError.textContent = "Please enter a theme description.";
+                    apiError.style.display = 'block';
+                    return;
+                }
+                
+                themeBtn.classList.add('loading');
+                apiError.style.display = 'none';
+
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                
+                const schema = {
+                    type: "OBJECT",
+                    properties: {
+                        bgDark: { type: "STRING", description: "A very dark background color, e.g., for the page body. In hex format." },
+                        bgLight: { type: "STRING", description: "A lighter background color for UI elements like cards. In hex format." },
+                        textPrimary: { type: "STRING", description: "Primary text color, high contrast with backgrounds. In hex format." },
+                        textSecondary: { type: "STRING", description: "Secondary text color, for labels or less important text. In hex format." },
+                        accentPrimary: { type: "STRING", description: "The main accent color, used for the snake's body. Should be vibrant. In hex format." },
+                        accentSecondary: { type: "STRING", description: "A secondary accent color, used for the snake's head. Should complement the primary accent. In hex format." },
+                        foodColor: { type: "STRING", description: "The color of the food item. Should stand out. In hex format." },
+                    },
+                    required: ["bgDark", "bgLight", "textPrimary", "textSecondary", "accentPrimary", "accentSecondary", "foodColor"]
+                };
+
+                const payload = {
+                    contents: [{
+                        parts: [{ text: `Generate a color theme palette for a snake game based on this theme: "${userPrompt}". Provide 7 colors.` }]
+                    }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: schema
+                    }
+                };
+                
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates.length > 0) {
+                        const themeText = result.candidates[0].content.parts[0].text;
+                        const theme = JSON.parse(themeText);
+                        applyTheme(theme);
+                    } else {
+                        throw new Error("Invalid response from API.");
+                    }
+
+                } catch (error) {
+                    console.error("Error generating theme:", error);
+                    apiError.textContent = "Could not generate theme. Please try again.";
+                    apiError.style.display = 'block';
+                } finally {
+                    themeBtn.classList.remove('loading');
+                }
+            }
+
+            function applyTheme(theme) {
+                const root = document.documentElement;
+                root.style.setProperty('--bg-dark', theme.bgDark);
+                root.style.setProperty('--bg-light', theme.bgLight);
+                root.style.setProperty('--text-primary', theme.textPrimary);
+                root.style.setProperty('--text-secondary', theme.textSecondary);
+                root.style.setProperty('--accent-primary', theme.accentPrimary);
+                root.style.setProperty('--accent-secondary', theme.accentSecondary);
+                root.style.setProperty('--food-color', theme.foodColor);
+            }
+
+
+            // --- Controls ---
+            function changeDirection(event) {
+                if (changingDirection || !direction) return;
+                const key = event.key.toLowerCase();
+                const isGoingUp = direction.y < 0;
+                const isGoingDown = direction.y > 0;
+                const isGoingRight = direction.x > 0;
+                const isGoingLeft = direction.x < 0;
+
+                if ((key === 'arrowup' || key === 'w') && !isGoingDown) {
+                    direction = { x: 0, y: -gridSize };
+                    changingDirection = true;
+                } else if ((key === 'arrowdown' || key === 's') && !isGoingUp) {
+                    direction = { x: 0, y: gridSize };
+                    changingDirection = true;
+                } else if ((key === 'arrowleft' || key === 'a') && !isGoingRight) {
+                    direction = { x: -gridSize, y: 0 };
+                    changingDirection = true;
+                } else if ((key === 'arrowright' || key === 'd') && !isGoingLeft) {
+                    direction = { x: gridSize, y: 0 };
+                    changingDirection = true;
+                }
+            }
+            
+            function setupControls() {
+                document.addEventListener('keydown', changeDirection);
+                document.getElementById('up-btn').addEventListener('click', () => { if (direction.y <= 0) { direction = { x: 0, y: -gridSize }; changingDirection = true; } });
+                document.getElementById('down-btn').addEventListener('click', () => { if (direction.y >= 0) { direction = { x: 0, y: gridSize }; changingDirection = true; } });
+                document.getElementById('left-btn').addEventListener('click', () => { if (direction.x <= 0) { direction = { x: -gridSize, y: 0 }; changingDirection = true; } });
+                document.getElementById('right-btn').addEventListener('click', () => { if (direction.x >= 0) { direction = { x: gridSize, y: 0 }; changingDirection = true; } });
+                restartBtn.addEventListener('click', initializeGame);
+                themeBtn.addEventListener('click', generateTheme);
+            }
+
+            // --- Initialization ---
+            function startApp() {
+                setupCanvas();
+                setupControls();
+                initializeGame();
+                initializeBackground();
+                if (backgroundAnimationId) {
+                    cancelAnimationFrame(backgroundAnimationId);
+                }
+                animateBackground();
+            }
+            
+            startApp();
+
+            window.addEventListener('resize', () => {
+                clearTimeout(window.resizeTimeout);
+                window.resizeTimeout = setTimeout(startApp, 100);
+            });
+
+        });
+    </script>
+</body>
+</html>
+�
