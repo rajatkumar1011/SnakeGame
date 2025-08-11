@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SnakeGame</title>
+    <title>Snake Game</title>
     <style>
         :root {
             --bg-dark: #0D1117;
@@ -39,10 +39,12 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            padding: 2rem 0;
+            box-sizing: border-box;
             touch-action: none;
-            overflow: hidden;
+            overflow-y: auto;
         }
 
         #page-background-canvas {
@@ -51,7 +53,7 @@
             left: 0;
             width: 100vw;
             height: 100vh;
-            z-index: 0;
+            z-index: -1;
         }
 
         #game-container {
@@ -66,8 +68,9 @@
             position: relative;
             z-index: 10;
             overflow: hidden;
-            /* [CHANGED] Zoomed out the game container slightly */
-            transform: scale(0.95);
+            /* [CHANGED] Zoomed out to 80% for a better default view on laptops */
+            transform: scale(0.8);
+            margin-bottom: -2rem; /* [CHANGED] Adjusted margin to keep footer close */
         }
         
         #game-container::before {
@@ -308,16 +311,12 @@
             display: none;
         }
         
-        /* [NEW] Footer styles */
         #footer {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
             text-align: center;
             color: var(--text-secondary);
             font-size: 0.8rem;
-            z-index: 20;
+            z-index: 10;
+            position: relative;
         }
         
         #social-links {
@@ -366,15 +365,14 @@
         <div id="theme-generator">
             <input type="text" id="theme-prompt" placeholder="e.g., vaporwave sunset">
             <button id="theme-btn">
-                <span class="text">✨ Generate Theme</span>
+                <span class="text">Generate Theme</span>
                 <div class="loader"></div>
             </button>
             <p id="api-error"></p>
         </div>
-        <button id="restart-btn">Play Again</button>
+        <button id="restart-btn">RePlay</button>
     </div>
     
-    <!-- [NEW] Footer with credit and social links -->
     <div id="footer">
         <p>Made with ❤️ by Rajat Kumar</p>
         <div id="social-links">
@@ -565,13 +563,20 @@
 
             function createFood() {
                 let foodPosition;
-                do {
+                let validPosition = false;
+                while (!validPosition) {
                     foodPosition = {
                         x: Math.floor(Math.random() * 20) * gridSize,
                         y: Math.floor(Math.random() * 20) * gridSize,
                         emoji: fruitEmojis[Math.floor(Math.random() * fruitEmojis.length)]
                     };
-                } while (snake && snake.some(part => part.x === foodPosition.x && part.y === foodPosition.y));
+
+                    const overlaps = snake.some(part => Math.abs(part.x - foodPosition.x) < 1 && Math.abs(part.y - foodPosition.y) < 1);
+
+                    if (!overlaps) {
+                        validPosition = true;
+                    }
+                }
                 food = foodPosition;
             }
 
